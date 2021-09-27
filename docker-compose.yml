@@ -1,0 +1,76 @@
+version: '3'
+services:
+
+
+  api:
+    build:
+      context: ./sr/api/
+      dockerfile: Dockerfile
+    environment:
+      - CELERY_NAME=main
+      - CELERY_BROKER=redis://redis:6379/0
+    networks:
+      - default
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.api.rule=Host(`localhost`)"
+      - "traefik.http.routers.api.entrypoints=web"
+
+
+  stats:
+    build:
+      context: ./sr/stats
+      dockerfile: Dockerfile
+    depends_on:
+      - redis
+      - postgres
+    networks:
+      - default
+    environment:
+      - CELERY_NAME=main
+      - CELERY_BROKER=redis://redis:6379/0
+      - POSTGRES_HOST=postgres
+    restart: on-failure:3
+
+
+  traefik:
+    image: traefik:v2.2
+    command:
+      - --api.insecure=true
+      - --providers.docker=true
+      - --providers.docker.exposedbydefault=false
+      - --entrypoints.web.address=:80
+      - --certificatesresolvers.le.acme.email=valerian@yzr.ai
+      - --certificatesresolvers.le.acme.storage=/acme.json
+      - --certificatesresolvers.le.acme.tlschallenge=true
+    ports:
+     - "80:80"
+     - "443:443"
+    networks:
+      - default
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+    depends_on:
+      - api
+      - redis
+
+
+  postgres:
+    image: postgres:13.4
+    volumes:
+      - ./postgres/init.sql:/docker-entrypoint-initdb.d/init.sql
+    environment:
+      - POSTGRES_PASSWORD=postgres
+    ports:
+     - "5432:5432"
+
+
+  redis:
+    image: redis
+    networks:
+      - default
+
+
+networks:
+  default:
+    driver: bridge

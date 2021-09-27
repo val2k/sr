@@ -1,0 +1,7 @@
+celery
+click
+redis
+pandas
+nltk
+psycopg2
+redis
